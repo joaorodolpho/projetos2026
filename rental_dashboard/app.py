@@ -68,6 +68,8 @@ with st.sidebar:
     st.markdown("### ⚙️ Configurações Global")
     taxa_multa = st.number_input("Multa Atraso (%)", value=10.0, step=0.5)
     taxa_juros = st.number_input("Juros Mensais (%)", value=1.0, step=0.1)
+    
+    st.caption("v1.5 - Correção BCB & Upload")
 
 # --- Lógica Principal ---
 def main():
