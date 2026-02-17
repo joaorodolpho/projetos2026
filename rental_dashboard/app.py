@@ -88,7 +88,17 @@ def main():
         df = pd.DataFrame(data)
         df['Vencimento'] = pd.to_datetime(df['Vencimento'])
 
+
     if df is not None:
+        # Normalização de Dados
+        try:
+            # Garante que a coluna de vencimento seja data
+            df['Vencimento'] = pd.to_datetime(df['Vencimento'], dayfirst=True)
+            # Garante que valor seja numérico
+            df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0.0)
+        except Exception as e:
+            st.error(f"Erro no formato da planilha: {e}. Verifique as colunas 'Vencimento' e 'Valor'.")
+            st.stop()
         # Processamento de Atrasos
         hoje = pd.Timestamp.now()
         
