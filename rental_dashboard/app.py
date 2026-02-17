@@ -92,10 +92,16 @@ def main():
     if df is not None:
         # Normalização de Dados
         try:
-            # Garante que a coluna de vencimento seja data
-            df['Vencimento'] = pd.to_datetime(df['Vencimento'], dayfirst=True)
+            # Garante que a coluna de vencimento seja data (formato misto para maior robustez)
+            df['Vencimento'] = pd.to_datetime(df['Vencimento'], errors='coerce', dayfirst=True, format='mixed')
             # Garante que valor seja numérico
             df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0.0)
+            
+            # Remove linhas onde a data não pôde ser convertida (NaT)
+            if df['Vencimento'].isna().any():
+                st.warning("⚠️ Algumas datas não puderam ser lidas e foram ignoradas. Verifique se estão no formato Dia/Mês/Ano.")
+                df = df.dropna(subset=['Vencimento'])
+                
         except Exception as e:
             st.error(f"Erro no formato da planilha: {e}. Verifique as colunas 'Vencimento' e 'Valor'.")
             st.stop()
