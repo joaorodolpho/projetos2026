@@ -72,13 +72,32 @@ def smart_normalize_columns(df):
         
     df.columns = df.columns.str.strip() # Remove espaços extras
     
-    # Dicionário de sinônimos para colunas padrão
+    # Dicionário de sinônimos para colunas padrão (Expandido)
     synonyms = {
-        'Valor': ['valor', 'total', 'aluguel', 'preço', 'quantia', 'montante', 'devido', 'debito'],
-        'Vencimento': ['vencimento', 'data', 'venc', 'dt_venc', 'dia', 'periodo'],
-        'Inquilino': ['inquilino', 'cliente', 'locatario', 'nome', 'morador', 'pessoa'],
-        'Status': ['status', 'estado', 'situacao', 'pagamento'],
-        'Pago_em': ['pago', 'data_pagamento', 'quitado', 'recebido']
+        'Valor': [
+            'valor', 'total', 'aluguel', 'preço', 'quantia', 'montante', 'devido', 'debito', 
+            'arrecadado', 'pagar', 'cobrado', 'mensalidade', 'boleto', 'price', 'amount', 'value', 'cost'
+        ],
+        'Vencimento': [
+            'vencimento', 'data', 'venc', 'dt_venc', 'dia', 'periodo', 'competencia', 
+            'prazo', 'limite', 'date', 'due_date', 'deadline', 'when'
+        ],
+        'Inquilino': [
+            'inquilino', 'cliente', 'locatario', 'nome', 'morador', 'pessoa', 'pagador', 
+            'responsavel', 'condomino', 'usuario', 'sacado', 'tenant', 'name', 'client', 'payer'
+        ],
+        'Status': [
+            'status', 'estado', 'situacao', 'pagamento', 'condicao', 'posicao', 
+            'situ', 'estagio', 'state', 'condition', 'situation'
+        ],
+        'Pago_em': [
+            'pago', 'data_pagamento', 'quitado', 'recebido', 'baixa', 'confirmacao', 
+            'compensacao', 'paid', 'payment_date', 'receipt'
+        ],
+        'Imóvel': [
+            'imovel', 'unidade', 'apartamento', 'sala', 'casa', 'loja', 'apto', 
+            'bloco', 'edificio', 'condominio', 'property', 'unit', 'location'
+        ]
     }
     
     # Mapeamento final
