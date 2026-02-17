@@ -257,7 +257,7 @@ def main():
             if st.button("Atualizar IPCA (Últimos 12 meses)"):
                 with st.spinner("Buscando dados no Banco Central..."):
                     # Data de 1 ano atrás
-                    start_date = (pd.Timestamp.now() - pd.DateOffset(months=12)).strftime('%d/%m/%Y')
+                    start_date = (pd.Timestamp.now() - pd.DateOffset(months=12)).strftime('%Y-%m-%d')
                     ipca_series = data_loader.get_inflation_index('IPCA', start_date)
                     if ipca_series is not None:
                         acumulado = ipca_series.sum()

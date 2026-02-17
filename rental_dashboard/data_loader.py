@@ -53,7 +53,7 @@ def load_data(uploaded_file):
                 st.error("Não foi possível ler o arquivo CSV. Verifique se ele não está corrompido.")
                 return None
         else:
-            return pd.read_excel(uploaded_file)
+            df = pd.read_excel(uploaded_file)
         
         # Padronização básica de colunas (caso necessário)
         # df.columns = [c.lower().replace(' ', '_') for c in df.columns]
