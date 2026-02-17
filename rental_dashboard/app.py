@@ -267,8 +267,13 @@ def main():
                         # Extrai o valor escalar (float)
                         val_acumulado = acumulado_series.iloc[0] if isinstance(acumulado_series, pd.Series) else acumulado_series
                         
-                        st.metric("IPCA Acumulado (12m)", f"{val_acumulado:.2f}%")
-                        st.line_chart(ipca_series)
+                        try:
+                            st.metric("IPCA Acumulado (12m)", f"{val_acumulado:.2f}%")
+                            st.line_chart(ipca_series)
+                        except TypeError as e:
+                            st.error(f"Erro de Tipo: {e}")
+                            st.write(f"Valor recebido: {val_acumulado} (Tipo: {type(val_acumulado)})")
+                            st.write("Dados brutos:", ipca_series)
                     else:
                         st.error("Não foi possível buscar dados do BCB.")
 
