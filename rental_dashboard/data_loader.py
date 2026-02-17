@@ -62,3 +62,53 @@ def load_data(uploaded_file):
     except Exception as e:
         st.error(f"Erro ao carregar arquivo: {e}")
         return None
+
+def smart_normalize_columns(df):
+    """
+    Tenta identificar automaticamente as colunas necessárias usando palavras-chave.
+    """
+    if df is None:
+        return None
+        
+    df.columns = df.columns.str.strip() # Remove espaços extras
+    
+    # Dicionário de sinônimos para colunas padrão
+    synonyms = {
+        'Valor': ['valor', 'total', 'aluguel', 'preço', 'quantia', 'montante', 'devido', 'debito'],
+        'Vencimento': ['vencimento', 'data', 'venc', 'dt_venc', 'dia', 'periodo'],
+        'Inquilino': ['inquilino', 'cliente', 'locatario', 'nome', 'morador', 'pessoa'],
+        'Status': ['status', 'estado', 'situacao', 'pagamento'],
+        'Pago_em': ['pago', 'data_pagamento', 'quitado', 'recebido']
+    }
+    
+    # Mapeamento final
+    rename_map = {}
+    
+    # Colunas que já existem no DF (lowercase para comparação)
+    df_cols_lower = {c.lower(): c for c in df.columns}
+    
+    for target, keywords in synonyms.items():
+        # Se a coluna já existe exatamente, pula
+        if target in df.columns:
+            continue
+            
+        # Busca por palavras-chave
+        match = None
+        for col_lower, original_col in df_cols_lower.items():
+            # Verifica se alguma palavra-chave está contida no nome da coluna
+            if any(key in col_lower for key in keywords):
+                # Prioridade: 'total devido' ganha de 'multa total' se 'devido' for forte?
+                # Simplificação: Pega a primeira que der match com keywords fortes
+                match = original_col
+                break
+        
+        if match:
+            rename_map[match] = target
+            # Remove do pool para não mapear a mesma coluna duas vezes
+            if str(match).lower() in df_cols_lower:
+                del df_cols_lower[str(match).lower()]
+
+    if rename_map:
+        df = df.rename(columns=rename_map)
+        
+    return df

@@ -77,21 +77,9 @@ def main():
     if uploaded_file:
         df = data_loader.load_data(uploaded_file)
         
-        # Normalização de Nomes de Colunas
+        # Normalização Inteligente de Colunas
         if df is not None:
-            # Mapa de De -> Para
-            column_map = {
-                'Total Devido': 'Valor',
-                'Valor Aluguel': 'Valor',
-                'Pago em': 'Pago_em',
-                'Data Vencimento': 'Vencimento',
-                'Vencimento': 'Vencimento', # Mantém se já existir
-                'Inquilino': 'Inquilino',
-                'Imovel': 'Imóvel'
-            }
-            # Remove acentos e espaços das colunas do arquivo para facilitar o match
-            df.columns = df.columns.str.strip()
-            df = df.rename(columns=column_map)
+            df = data_loader.smart_normalize_columns(df)
             
             # Validação de Colunas Obrigatórias
             required_cols = ['Inquilino', 'Vencimento', 'Valor']
@@ -99,7 +87,14 @@ def main():
             
             if missing:
                 st.error(f"❌ Erro no formato do arquivo. Colunas obrigatórias não encontradas: {', '.join(missing)}")
-                st.warning(f"O sistema espera colunas com nomes parecidos com: **{', '.join(required_cols)}**.\n\nColunas encontradas no seu arquivo: {list(df.columns)}")
+                st.warning("O sistema tentou identificar automaticamente, mas falhou.")
+                st.info(f"Colunas do seu arquivo: {list(df.columns)}")
+                st.markdown("""
+                **Dica:** Tente renomear as colunas da sua planilha para algo como:
+                *   Nome do Cliente -> **Inquilino**
+                *   Data de Vencimento -> **Vencimento**
+                *   Valor Total -> **Valor**
+                """)
                 st.stop()
             
             # Se não tiver Status, cria padrão
