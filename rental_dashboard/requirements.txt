@@ -1,0 +1,8 @@
+streamlit
+pandas
+numpy
+plotly
+python-bcb
+openpyxl
+watchdog
+numpy-financial
