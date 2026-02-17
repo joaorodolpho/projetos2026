@@ -83,10 +83,27 @@ def main():
                 'Valor Aluguel': 'Valor',
                 'Pago em': 'Pago_em',
                 'Data Vencimento': 'Vencimento',
-                'Vencimento': 'Vencimento' # Mantém se já existir
+                'Vencimento': 'Vencimento', # Mantém se já existir
+                'Inquilino': 'Inquilino',
+                'Imovel': 'Imóvel'
             }
+            # Remove acentos e espaços das colunas do arquivo para facilitar o match
+            df.columns = df.columns.str.strip()
             df = df.rename(columns=column_map)
             
+            # Validação de Colunas Obrigatórias
+            required_cols = ['Inquilino', 'Vencimento', 'Valor']
+            missing = [c for c in required_cols if c not in df.columns]
+            
+            if missing:
+                st.error(f"❌ Erro no formato do arquivo. Colunas obrigatórias não encontradas: {', '.join(missing)}")
+                st.warning(f"O sistema espera colunas com nomes parecidos com: **{', '.join(required_cols)}**.\n\nColunas encontradas no seu arquivo: {list(df.columns)}")
+                st.stop()
+            
+            # Se não tiver Status, cria padrão
+            if 'Status' not in df.columns:
+                df['Status'] = 'Pendente'
+
             # Se ainda não tiver a coluna Valor, tenta achar alguma numérica que pareça dinheiro? 
             # (Melhor avisar, mas 'Total Devido' já cobre o caso do usuário)
     else:
@@ -110,6 +127,10 @@ def main():
             # Garante que a coluna de vencimento seja data (formato misto para maior robustez)
             df['Vencimento'] = pd.to_datetime(df['Vencimento'], errors='coerce', dayfirst=True, format='mixed')
             # Garante que valor seja numérico
+            # Remove 'R$' e espaços se for string antes de converter
+            if df['Valor'].dtype == object:
+                 df['Valor'] = df['Valor'].astype(str).str.replace('R$', '').str.replace('.', '').str.replace(',', '.').str.strip()
+            
             df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0.0)
             
             # Remove linhas onde a data não pôde ser convertida (NaT)
@@ -118,18 +139,22 @@ def main():
                 df = df.dropna(subset=['Vencimento'])
                 
         except Exception as e:
-            st.error(f"Erro no formato da planilha: {e}. Verifique as colunas 'Vencimento' e 'Valor'.")
+            st.error(f"Erro ao processar dados: {e}")
             st.stop()
+        
         # Processamento de Atrasos
         hoje = pd.Timestamp.now()
         
         # Filtros de Sidebar
-        inquilinos = st.multiselect("Filtrar Inquilino", options=df['Inquilino'].unique(), default=df['Inquilino'].unique())
-        df_filtered = df[df['Inquilino'].isin(inquilinos)].copy()
+        if 'Inquilino' in df.columns:
+             inquilinos = st.multiselect("Filtrar Inquilino", options=df['Inquilino'].unique(), default=df['Inquilino'].unique())
+             df_filtered = df[df['Inquilino'].isin(inquilinos)].copy()
+        else:
+             df_filtered = df.copy()
 
         # Cálculos de Atraso
         df_filtered['Dias Atraso'] = (hoje - df_filtered['Vencimento']).dt.days
-        df_filtered['Dias Atraso'] = df_filtered.apply(lambda x: max(0, x['Dias Atraso']) if x['Status'] != 'Pago' else 0, axis=1)
+        df_filtered['Dias Atraso'] = df_filtered.apply(lambda x: max(0, x['Dias Atraso']) if x.get('Status') != 'Pago' else 0, axis=1)
         
         # Cálculo Financeiro
         df_filtered['Multa Est.'] = df_filtered.apply(

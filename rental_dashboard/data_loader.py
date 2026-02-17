@@ -29,18 +29,31 @@ def load_data(uploaded_file):
     
     try:
         if uploaded_file.name.endswith('.csv'):
-            # Tenta ler com separador automático ou ponto e vírgula
+            # Estratégia Robusta: Tentar combinações de separadores e encodings
+            separators = [';', ',', '\t']
+            encodings = ['utf-8', 'latin1', 'cp1252']
+            
+            for enc in encodings:
+                for sep in separators:
+                    try:
+                        uploaded_file.seek(0)
+                        df = pd.read_csv(uploaded_file, sep=sep, encoding=enc, engine='python')
+                        
+                        # Critério de sucesso: Ter mais de 1 coluna
+                        if len(df.columns) > 1:
+                            return df
+                    except:
+                        continue
+            
+            # Última tentativa: engine python com sep=None (sniffing)
             try:
-                # Tenta primeiro com ponto e vírgula (comum no Brasil)
-                df = pd.read_csv(uploaded_file, sep=';')
-                if len(df.columns) <= 1: # Fallback se não separou corretamente
-                    uploaded_file.seek(0)
-                    df = pd.read_csv(uploaded_file, sep=',')
-            except:
                 uploaded_file.seek(0)
-                df = pd.read_csv(uploaded_file, sep=None, engine='python')
+                return pd.read_csv(uploaded_file, sep=None, engine='python')
+            except:
+                st.error("Não foi possível ler o arquivo CSV. Verifique se ele não está corrompido.")
+                return None
         else:
-            df = pd.read_excel(uploaded_file)
+            return pd.read_excel(uploaded_file)
         
         # Padronização básica de colunas (caso necessário)
         # df.columns = [c.lower().replace(' ', '_') for c in df.columns]
