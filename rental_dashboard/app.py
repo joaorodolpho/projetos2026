@@ -260,8 +260,12 @@ def main():
                     start_date = (pd.Timestamp.now() - pd.DateOffset(months=12)).strftime('%Y-%m-%d')
                     ipca_series = data_loader.get_inflation_index('IPCA', start_date)
                     if ipca_series is not None:
-                        acumulado = ipca_series.sum()
-                        st.metric("IPCA Acumulado (12m)", f"{acumulado:.2f}%")
+                        # ipca_series é um DataFrame, sum() retorna uma Series
+                        acumulado_series = ipca_series.sum()
+                        # Extrai o valor escalar (float)
+                        val_acumulado = acumulado_series.iloc[0] if isinstance(acumulado_series, pd.Series) else acumulado_series
+                        
+                        st.metric("IPCA Acumulado (12m)", f"{val_acumulado:.2f}%")
                         st.line_chart(ipca_series)
                     else:
                         st.error("Não foi possível buscar dados do BCB.")
