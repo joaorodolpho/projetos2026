@@ -74,6 +74,21 @@ def main():
     # Carregamento de Dados
     if uploaded_file:
         df = data_loader.load_data(uploaded_file)
+        
+        # Normalização de Nomes de Colunas
+        if df is not None:
+            # Mapa de De -> Para
+            column_map = {
+                'Total Devido': 'Valor',
+                'Valor Aluguel': 'Valor',
+                'Pago em': 'Pago_em',
+                'Data Vencimento': 'Vencimento',
+                'Vencimento': 'Vencimento' # Mantém se já existir
+            }
+            df = df.rename(columns=column_map)
+            
+            # Se ainda não tiver a coluna Valor, tenta achar alguma numérica que pareça dinheiro? 
+            # (Melhor avisar, mas 'Total Devido' já cobre o caso do usuário)
     else:
         # Dados de Exemplo para demonstração
         st.info("ℹ️ Carregue uma planilha para começar. Usando dados de exemplo...")

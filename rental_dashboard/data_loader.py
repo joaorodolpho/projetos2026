@@ -29,7 +29,16 @@ def load_data(uploaded_file):
     
     try:
         if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
+            # Tenta ler com separador automático ou ponto e vírgula
+            try:
+                # Tenta primeiro com ponto e vírgula (comum no Brasil)
+                df = pd.read_csv(uploaded_file, sep=';')
+                if len(df.columns) <= 1: # Fallback se não separou corretamente
+                    uploaded_file.seek(0)
+                    df = pd.read_csv(uploaded_file, sep=',')
+            except:
+                uploaded_file.seek(0)
+                df = pd.read_csv(uploaded_file, sep=None, engine='python')
         else:
             df = pd.read_excel(uploaded_file)
         
