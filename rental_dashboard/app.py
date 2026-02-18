@@ -72,205 +72,200 @@ with st.sidebar:
     st.caption("v1.5 - Correção BCB & Upload")
 
 # --- Lógica Principal ---
+# --- Lógica Principal ---
 def main():
-    # Carregamento de Dados
+    # Inicialização do Estado (Persistência)
+    if 'main_df' not in st.session_state:
+        st.session_state['main_df'] = None
+    
+    # 1. Carregamento e Processamento Inicial
     if uploaded_file:
-        df = data_loader.load_data(uploaded_file)
+        # Se mudou o arquivo ou ainda não processou
+        # Check simples: se temos arquivo mas o df no state é None ou diferente (seria complexo checar diff, assumimos reload)
+        # Para evitar reload a cada interação, usamos o cache do data_loader, mas precisamos colocar no session_state
         
-        # Normalização Inteligente de Colunas
-        if df is not None:
-            df = data_loader.smart_normalize_columns(df)
+        # Carrega brutos
+        raw_df = data_loader.load_data(uploaded_file)
+        
+        if raw_df is not None:
+             # Normaliza
+            norm_df = data_loader.smart_normalize_columns(raw_df)
             
-            # Validação de Colunas Obrigatórias
+            # Validação Básica
             required_cols = ['Inquilino', 'Vencimento', 'Valor']
-            missing = [c for c in required_cols if c not in df.columns]
+            missing = [c for c in required_cols if c not in norm_df.columns]
             
             if missing:
-                st.error(f"❌ Erro no formato do arquivo. Colunas obrigatórias não encontradas: {', '.join(missing)}")
-                st.warning("O sistema tentou identificar automaticamente, mas falhou.")
-                st.info(f"Colunas do seu arquivo: {list(df.columns)}")
-                st.markdown("""
-                **Dica:** Tente renomear as colunas da sua planilha para algo como:
-                *   Nome do Cliente -> **Inquilino**
-                *   Data de Vencimento -> **Vencimento**
-                *   Valor Total -> **Valor**
-                """)
+                st.error(f"❌ Erro: Colunas faltando: {', '.join(missing)}")
                 st.stop()
             
-            # Se não tiver Status, cria padrão
-            if 'Status' not in df.columns:
-                df['Status'] = 'Pendente'
-
-            # Se ainda não tiver a coluna Valor, tenta achar alguma numérica que pareça dinheiro? 
-            # (Melhor avisar, mas 'Total Devido' já cobre o caso do usuário)
-    else:
-        # Dados de Exemplo para demonstração
-        st.info("ℹ️ Carregue uma planilha para começar. Usando dados de exemplo...")
-        data = {
-            'Inquilino': ['João Silva', 'Maria Oliveira', 'Construtora XYZ', 'Pedro Santos'],
-            'Imóvel': ['Apt 101', 'Sala Comercial 20', 'Galpão Ind.', 'Apt 304'],
-            'Vencimento': ['2025-01-10', '2025-02-15', '2024-12-10', '2025-02-25'],
-            'Valor': [2500.00, 4200.00, 15000.00, 1800.00],
-            'Status': ['Pago', 'Pendente', 'Atrasado', 'Pendente'],
-            'Pago_em': ['2025-01-10', None, None, None]
-        }
-        df = pd.DataFrame(data)
-        df['Vencimento'] = pd.to_datetime(df['Vencimento'])
-
-
-    if df is not None:
-        # Normalização de Dados
-        try:
-            # Garante que a coluna de vencimento seja data (formato misto para maior robustez)
-            df['Vencimento'] = pd.to_datetime(df['Vencimento'], errors='coerce', dayfirst=True, format='mixed')
-            # Garante que valor seja numérico
-            # Remove 'R$' e espaços se for string antes de converter
-            if df['Valor'].dtype == object:
-                 df['Valor'] = df['Valor'].astype(str).str.replace('R$', '').str.replace('.', '').str.replace(',', '.').str.strip()
-            
-            df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0.0)
-            
-            # Remove linhas onde a data não pôde ser convertida (NaT)
-            if df['Vencimento'].isna().any():
-                st.warning("⚠️ Algumas datas não puderam ser lidas e foram ignoradas. Verifique se estão no formato Dia/Mês/Ano.")
-                df = df.dropna(subset=['Vencimento'])
+            # Padronização de Tipos (Sempre que carregar novo arquivo)
+            try:
+                norm_df['Vencimento'] = pd.to_datetime(norm_df['Vencimento'], errors='coerce', dayfirst=True, format='mixed')
+                if norm_df['Valor'].dtype == object:
+                     norm_df['Valor'] = norm_df['Valor'].astype(str).str.replace('R$', '').str.replace('.', '').str.replace(',', '.').str.strip()
+                norm_df['Valor'] = pd.to_numeric(norm_df['Valor'], errors='coerce').fillna(0.0)
+                if 'Status' not in norm_df.columns:
+                    norm_df['Status'] = 'Pendente'
+            except Exception as e:
+                st.error(f"Erro ao processar dados: {e}")
+                st.stop()
                 
-        except Exception as e:
-            st.error(f"Erro ao processar dados: {e}")
-            st.stop()
+            # Salva no Session State APENAS SE FOR A PRIMEIRA VEZ DESSA SESSÃO OU UPLOAD
+            # Para permitir persistência das edições, só sobrescrevemos se o usuário acabou de subir o arquivo (interação do uploader)
+            # Como o uploader limpa no refresh, se ele está aqui é porque foi enviado agora.
+            st.session_state['main_df'] = norm_df
+
+    elif st.session_state['main_df'] is None:
+        # Carrega dados de exemplo se não tiver nada
+        st.info("ℹ️ Modo Demonstração (Carregue seu arquivo na lateral)")
+        data = {
+            'Inquilino': ['João Silva', 'Maria Oliveira', 'Construtora XYZ', 'Pedro Santos', 'Ana Costa', 'Roberto Freire'],
+            'Imóvel': ['Apt 101', 'Sala 20', 'Galpão B', 'Apt 304', 'Loja 01', 'Casa 05'],
+            'Vencimento': ['2026-02-10', '2026-02-15', '2025-12-10', '2026-02-25', '2026-01-30', '2026-02-05'],
+            'Valor': [2500.00, 4200.00, 15000.00, 1800.00, 3000.00, 5500.00],
+            'Status': ['Pago', 'Pendente', 'Atrasado', 'Pendente', 'Atrasado', 'Pago'],
+            'Pago_em': ['2026-02-10', None, None, None, None, '2026-02-05']
+        }
+        ex_df = pd.DataFrame(data)
+        ex_df['Vencimento'] = pd.to_datetime(ex_df['Vencimento'])
+        st.session_state['main_df'] = ex_df
+
+    # 2. Fluxo Principal (Trabalha sempre com o Session State)
+    if st.session_state['main_df'] is not None:
+        df = st.session_state['main_df'].copy()
         
-        # Processamento de Atrasos
+        # --- Cálculos Preliminares (para mostrar na tabela) ---
         hoje = pd.Timestamp.now()
+        df['Dias Atraso'] = (hoje - df['Vencimento']).dt.days
+        df['Dias Atraso'] = df.apply(lambda x: max(0, x['Dias Atraso']) if x.get('Status') != 'Pago' else 0, axis=1)
         
-        # Filtros de Sidebar
-        if 'Inquilino' in df.columns:
-             inquilinos = st.multiselect("Filtrar Inquilino", options=df['Inquilino'].unique(), default=df['Inquilino'].unique())
-             df_filtered = df[df['Inquilino'].isin(inquilinos)].copy()
-        else:
-             df_filtered = df.copy()
+        df['Multa Est.'] = df.apply(lambda x: financial_engine.calculate_late_fee(x['Valor'], taxa_multa) if x['Dias Atraso'] > 0 else 0, axis=1)
+        df['Juros Est.'] = df.apply(lambda x: financial_engine.calculate_interest(x['Valor'], x['Dias Atraso'], taxa_juros) if x['Dias Atraso'] > 0 else 0, axis=1)
+        df['Total Devido'] = df['Valor'] + df['Multa Est.'] + df['Juros Est.']
 
-        # Cálculos de Atraso
-        df_filtered['Dias Atraso'] = (hoje - df_filtered['Vencimento']).dt.days
-        df_filtered['Dias Atraso'] = df_filtered.apply(lambda x: max(0, x['Dias Atraso']) if x.get('Status') != 'Pago' else 0, axis=1)
+        # --- Interface ---
         
-        # Cálculo Financeiro
-        df_filtered['Multa Est.'] = df_filtered.apply(
-            lambda x: financial_engine.calculate_late_fee(x['Valor'], taxa_multa) if x['Dias Atraso'] > 0 else 0, axis=1
-        )
-        df_filtered['Juros Est.'] = df_filtered.apply(
-            lambda x: financial_engine.calculate_interest(x['Valor'], x['Dias Atraso'], taxa_juros) if x['Dias Atraso'] > 0 else 0, axis=1
-        )
-        df_filtered['Valor Total Devido'] = df_filtered['Valor'] + df_filtered['Multa Est.'] + df_filtered['Juros Est.']
-
-        # --- Dashboard ---
+        # 2.1 Tabela Interativa (vem ANTES dos resultados para permitir edição)
+        st.subheader("📋 Painel de Controle")
+        st.caption("Edite os dados abaixo (Status, Datas) e veja os resultados atualizarem automaticamente.")
         
-        # KPIs
-        total_recebido = df_filtered[df_filtered['Status'] == 'Pago']['Valor'].sum()
-        total_atrasado = df_filtered[df_filtered['Status'] == 'Atrasado']['Valor Total Devido'].sum()
-        total_pendente = df_filtered[df_filtered['Status'] == 'Pendente']['Valor'].sum()
-        
-        col1, col2, col3 = st.columns(3)
-        col1.metric("💰 Total Recebido", f"R$ {total_recebido:,.2f}", delta_color="normal")
-        col2.metric("⚠️ Total em Atraso (c/ Multa)", f"R$ {total_atrasado:,.2f}", delta="-High", delta_color="inverse")
-        col3.metric("📅 A Vencer/Pendente", f"R$ {total_pendente:,.2f}", delta_color="off")
-
-        st.markdown("---")
-
-        # Tabela Interativa
-        st.subheader("📋 Gestão de Recebimentos")
-        
-        # Edição de dados
         edited_df = st.data_editor(
-            df_filtered,
+            df,
             column_config={
-                "Valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f"),
-                "Multa Est.": st.column_config.NumberColumn("Multa (Est.)", format="R$ %.2f", disabled=True),
-                "Juros Est.": st.column_config.NumberColumn("Juros (Est.)", format="R$ %.2f", disabled=True),
-                "Valor Total Devido": st.column_config.NumberColumn("Total Devido", format="R$ %.2f", disabled=True),
+                "Valor": st.column_config.NumberColumn("Valor Original", format="R$ %.2f"),
+                "Multa Est.": st.column_config.NumberColumn("Multa", format="R$ %.2f", disabled=True),
+                "Juros Est.": st.column_config.NumberColumn("Juros", format="R$ %.2f", disabled=True),
+                "Total Devido": st.column_config.NumberColumn("Total Cobrar", format="R$ %.2f", disabled=True),
                 "Vencimento": st.column_config.DateColumn("Vencimento", format="DD/MM/YYYY"),
-                "Status": st.column_config.SelectboxColumn(
-                    "Status",
-                    options=["Pago", "Pendente", "Atrasado"],
-                    help="Selecione o status do pagamento"
-                )
+                "Status": st.column_config.SelectboxColumn("Status", options=["Pago", "Pendente", "Atrasado"], required=True)
             },
             hide_index=True,
             use_container_width=True,
             num_rows="dynamic",
-            key="editor_grid"
-        )
-        
-        
-        # Botão para Salvar (Simulado)
-        if st.button("💾 Salvar Alterações"):
-            st.success("Dados atualizados com sucesso! (Integração com persistência pendente)")
-            st.session_state['data_changed'] = True
-
-        # Exportação
-        st.download_button(
-            label="📥 Gerar Relatório (Excel)",
-            data=edited_df.to_csv(index=False).encode('utf-8'),
-            file_name=f'relatorio_aluguel_{datetime.now().strftime("%Y%m%d")}.csv',
-            mime='text/csv',
-            help="Baixar tabela atualizada em formato CSV (compatível com Excel)"
+            key="editor_main" # Key importante para cache do widget
         )
 
-
-        # Gráficos e Calculadora
-        c1, c2 = st.columns([2, 1])
+        # Atualiza o session state com as edições para persistir se recarregar algo
+        # (Opcional, mas bom para manter sincronia se tivermos outros inputs)
         
-        with c1:
-            st.subheader("📈 Evolução Financeira")
-            # Gráfico Simples
-            if not df_filtered.empty:
-                fig = px.bar(
-                    df_filtered, 
-                    x='Vencimento', 
-                    y='Valor', 
-                    color='Status',
-                    color_discrete_map={'Pago': '#27AE60', 'Atrasado': '#E74C3C', 'Pendente': '#F1C40F'},
-                    title="Recebimentos por Vencimento"
-                )
-                fig.update_layout(plot_bgcolor="white", height=350)
-                st.plotly_chart(fig, use_container_width=True)
-
-        with c2:
-            with st.expander("🧮 Calculadora Científica", expanded=True):
-                st.markdown("**Simulador de Amortização**")
-                calc_valor = st.number_input("Valor Financiado", 100000.0)
-                calc_taxa = st.number_input("Taxa Anual (%)", 12.0)
-                calc_prazo = st.number_input("Prazo (Meses)", 24)
-                
-                if st.button("Calcular Parcela"):
-                    pmt = financial_engine.financial_calculator(calc_taxa/100/12, calc_prazo, calc_valor)
-                    st.metric("Parcela Mensal (PMT)", f"R$ {pmt*(-1):,.2f}")
-
-        # BCB API Integration Check
+        # --- 3. Dashboard Analítico (Usa o EDITED_DF) ---
+        
         st.markdown("---")
-        st.subheader("🏦 Indicadores Financeiros (BCB)")
-        col_bcb1, col_bcb2 = st.columns(2)
+        st.subheader("📊 Performance Financeira")
         
-        with col_bcb1:
-            if st.button("Atualizar IPCA (Últimos 12 meses)"):
-                with st.spinner("Buscando dados no Banco Central..."):
-                    # Data de 1 ano atrás
-                    start_date = (pd.Timestamp.now() - pd.DateOffset(months=12)).strftime('%Y-%m-%d')
-                    ipca_series = data_loader.get_inflation_index('IPCA', start_date)
-                    if ipca_series is not None:
-                        # ipca_series é um DataFrame, sum() retorna uma Series
-                        acumulado_series = ipca_series.sum()
-                        # Extrai o valor escalar (float)
-                        val_acumulado = acumulado_series.iloc[0] if isinstance(acumulado_series, pd.Series) else acumulado_series
-                        
+        # Fazer cálculos finais sobre o DF EDITADO
+        # Recalcula totais para garantir precisão pós-edição
+        total_recebido = edited_df[edited_df['Status'] == 'Pago']['Valor'].sum()
+        
+        # Inadimplência Real (Total Devido atualizado)
+        df_atrasados = edited_df[edited_df['Status'] == 'Atrasado'].copy()
+        total_divida = df_atrasados['Total Devido'].sum()
+        count_atrasados = len(df_atrasados)
+        
+        total_pendente = edited_df[edited_df['Status'] == 'Pendente']['Valor'].sum()
+
+        kpi1, kpi2, kpi3 = st.columns(3)
+        kpi1.metric("💰 Receita Confirmada", f"R$ {total_recebido:,.2f}", delta="Caixa Realizado")
+        kpi2.metric("🚨 Inadimplência Total", f"R$ {total_divida:,.2f}", f"{count_atrasados} contratos", delta_color="inverse")
+        kpi3.metric("📅 Receita Futura/Pendente", f"R$ {total_pendente:,.2f}", delta="Fluxo Previsto")
+        
+        # --- 4. Hall of Shame (Devedores) ---
+        if not df_atrasados.empty:
+            st.error(f"🚨 **ALERTA DE COBRANÇA:** Existem {count_atrasados} pagamentos atrasados!")
+            
+            # Mostra apenas colunas relevantes
+            cols_show = ['Inquilino', 'Imóvel', 'Vencimento', 'Dias Atraso', 'Valor', 'Total Devido']
+            # Garante que as colunas existem
+            cols_final = [c for c in cols_show if c in df_atrasados.columns]
+            
+            st.dataframe(
+                df_atrasados[cols_final].sort_values('Dias Atraso', ascending=False),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Total Devido": st.column_config.NumberColumn("Valor Atualizado", format="R$ %.2f"),
+                    "Dias Atraso": st.column_config.ProgressColumn("Gravidade (Dias)", format="%d dias", min_value=0, max_value=90, help="Barra vermelha indica maior atraso")
+                }
+            )
+        else:
+            st.success("✅ Tudo em dia! Nenhum pagamento atrasado identificado.")
+
+        # --- 5. Gráficos ---
+        g1, g2 = st.columns(2)
+        
+        with g1:
+            # Gráfico de Pizza ou Barra Stacked para Status
+            fig_status = px.pie(edited_df, names='Status', values='Valor', hole=0.4, 
+                                title="Distribuição da Carteira (Por Valor)",
+                                color='Status',
+                                color_discrete_map={'Pago': '#27AE60', 'Atrasado': '#E74C3C', 'Pendente': '#F1C40F'})
+            st.plotly_chart(fig_status, use_container_width=True)
+            
+        with g2:
+             # Evolução temporal
+             edited_df['Mes'] = edited_df['Vencimento'].dt.strftime('%Y-%m')
+             df_timeline = edited_df.groupby(['Mes', 'Status'])['Valor'].sum().reset_index()
+             fig_time = px.bar(df_timeline, x='Mes', y='Valor', color='Status', 
+                               title="Cronograma de Vencimentos",
+                               color_discrete_map={'Pago': '#27AE60', 'Atrasado': '#E74C3C', 'Pendente': '#F1C40F'})
+             st.plotly_chart(fig_time, use_container_width=True)
+
+        # --- 6. Exportação e Ferramentas ---
+        c_exp, c_calc = st.columns([1,1])
+        with c_exp:
+            st.download_button(
+                label="📥 Baixar Relatório Completo",
+                data=edited_df.to_csv(index=False).encode('utf-8'),
+                file_name=f'relatorio_geral_{datetime.now().strftime("%d%m%Y")}.csv',
+                mime='text/csv'
+            )
+        
+        with c_calc:
+             with st.popover("🧮 Calculadora Financeira"):
+                st.write("**Simulador Rápido**")
+                v = st.number_input("Valor", 1000.0)
+                t = st.number_input("Taxa Anual %", 13.75)
+                p = st.number_input("Meses", 12)
+                st.code(f"Parcela: R$ {financial_engine.financial_calculator(t/100/12, p, v)*-1:,.2f}")
+
+        # BCB (Mantido)
+        st.markdown("---")
+        if st.checkbox("Exibir Indicadores Econômicos (BCB)"):
+             col_bcb1, col_bcb2 = st.columns(2)
+             with col_bcb1:
+                if st.button("Buscar IPCA"):
+                    with st.spinner("Conectando ao Banco Central..."):
                         try:
-                            st.metric("IPCA Acumulado (12m)", f"{val_acumulado:.2f}%")
-                            st.line_chart(ipca_series)
-                        except TypeError as e:
-                            st.error(f"Erro de Tipo: {e}")
-                            st.write(f"Valor recebido: {val_acumulado} (Tipo: {type(val_acumulado)})")
-                            st.write("Dados brutos:", ipca_series)
-                    else:
-                        st.error("Não foi possível buscar dados do BCB.")
+                            start = (pd.Timestamp.now() - pd.DateOffset(months=12)).strftime('%Y-%m-%d')
+                            s = data_loader.get_inflation_index('IPCA', start)
+                            if s is not None:
+                                val = s.sum()
+                                if isinstance(val, pd.Series): val = val.iloc[0]
+                                st.metric("IPCA 12 Meses", f"{val:.2f}%")
+                                st.line_chart(s)
+                        except Exception as e:
+                            st.error(f"Erro BCB: {e}")
 
 if __name__ == "__main__":
     main()
